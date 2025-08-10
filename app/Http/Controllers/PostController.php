@@ -8,6 +8,9 @@ use Inertia\Inertia;
 use App\Models\Post;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\Storage;
+
 
 class PostController extends Controller
 {
@@ -19,6 +22,11 @@ class PostController extends Controller
         $post = Post::with(['category', 'comments.user'])->withCount('comments')
             ->latest()
             ->paginate(10);
+
+        $posts = $post->through(function ($item) {
+            $item->image_url = $item->image_url; // memanggil accessor
+            return $item;
+        });
         $categories = Category::all();
         return Inertia::render('admin/posts', ['categories' => $categories, 'posts' => $post]);
     }
@@ -38,12 +46,16 @@ class PostController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'content' => 'required|string|max:255',
+            'content' => 'required|string|max:15000',
             'category_id' => 'required|exists:categories,id',
             'published_at' => 'nullable|date',
+            'image' => 'nullable|image|max:5000',
         ]);
         if ($request->filled('published_at')) {
             $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
+        }
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('posts', 'public');
         }
         $validated['slug'] = Str::slug($request->title);
         Post::create($validated);
@@ -75,27 +87,35 @@ class PostController extends Controller
         $post = Post::findOrFail($id);
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'content' => 'required|string|max:255',
+            'content' => 'required|string|max:15000',
             'category_id' => 'required|exists:categories,id',
             'published_at' => 'nullable|date',
+            'image' => 'nullable|image|max:5000',
         ]);
         if ($request->filled('published_at')) {
             $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
+        }
+        if ($request->hasFile('image')) {
+            // Hapus gambar lama jika ada
+            if ($post->image && Storage::disk('public')->exists($post->image)) {
+                Storage::disk('public')->delete($post->image);
+            }
+            $validated['image'] = $request->file('image')->store('posts', 'public');
         }
         $validated['slug'] = Str::slug($request->title);
         $post->update($validated);
 
         return redirect()->route('admin.posts.index')->with('success', 'Post updated successfully.');
     }
-    
+
     /**
      * Remove the specified resource from storage.
-    */
+     */
     public function destroy(string $id)
     {
         $post = Post::findOrFail($id);
         $post->delete();
-    
+
         return redirect()->route('admin.posts.index')->with('success', 'Post deleted successfully.');
     }
 }

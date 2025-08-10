@@ -27,6 +27,8 @@ interface Post {
     comments: Comment[];
     comments_count: number;
     created_at: string;
+    image?: string | null;
+    image_url?: string | null;
 }
 
 interface PostShowProps {
@@ -111,7 +113,7 @@ export default function PostShow({ post }: PostShowProps) {
                         <span>•</span>
                         <span>{post.comments_count} comments</span>
                     </div>
-
+                    {post.image_url && <img src={post.image_url} alt={post.title} className="mb-4 w-full rounded-lg" />}
                     <div className="prose mb-8 max-w-none">{post.content}</div>
 
                     {/* Comments Section */}

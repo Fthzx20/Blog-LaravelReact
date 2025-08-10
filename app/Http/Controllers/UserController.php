@@ -109,6 +109,7 @@ class UserController extends Controller
                 ],
                 'comments_count' => $post->comments_count ?? 0,
                 'created_at' => $post->created_at?->toIsoString() ?? '',
+                'image_url' => $post->image_url,
             ];
         });
         $categories = Category::all()->map(function ($category) {
@@ -150,6 +151,7 @@ class UserController extends Controller
                 }),
                 'comments_count' => $post->comments_count ?? 0,
                 'created_at' => $post->created_at?->toIsoString() ?? '',
+                'image_url' => $post->image_url,
             ],
         ]);
     }

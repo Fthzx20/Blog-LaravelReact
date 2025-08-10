@@ -10,6 +10,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Types for props
 interface User {
@@ -39,6 +40,8 @@ interface Post {
     published_at: string | null;
     comments: Comment[];
     comments_count: number;
+    image?: string | null;
+    image_url?: string | null;
 }
 
 interface PaginatedData {
@@ -73,15 +76,28 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
     const [editPost, setEditPost] = useState<Post | null>(null);
     const [formData, setFormData] = useState({
         title: '',
+        image: null as File | null,
         content: '',
         category_id: '',
         published_at: '',
     });
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setPreviewImage(URL.createObjectURL(file));
+        } else {
+            setPreviewImage(null);
+        }
+    };
 
     const handleAdd = () => {
         setEditPost(null);
+        setPreviewImage(null);
         setFormData({
             title: '',
+            image: null,
             content: '',
             category_id: '',
             published_at: '',
@@ -91,8 +107,10 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
 
     const handleEdit = (post: Post) => {
         setEditPost(post);
+        setPreviewImage(post.image_url ?? null);
         setFormData({
             title: post.title,
+            image: null,
             content: post.content,
             category_id: post.category_id.toString(),
             published_at: post.published_at || '',
@@ -122,36 +140,34 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        const payload = new FormData();
+        payload.append('title', formData.title);
+        if (formData.image) payload.append('image', formData.image);
+        payload.append('content', formData.content);
+        payload.append('category_id', formData.category_id);
+        payload.append('published_at', formData.published_at);
+
         if (editPost) {
-            router.put(`/admin/posts/${editPost.id}`, formData, {
+            payload.append('_method', 'PUT'); // Laravel baca ini sebagai update
+            router.post(`/admin/posts/${editPost.id}`, payload, {
+                forceFormData: true,
                 onSuccess: () => {
                     setShowModal(false);
-                    toast.success('Post updated successfully', {
-                        duration: 3000,
-                        position: 'top-right',
-                    });
+                    toast.success('Post updated successfully');
                 },
                 onError: () => {
-                    toast.error('Failed to update post', {
-                        duration: 3000,
-                        position: 'top-right',
-                    });
+                    toast.error('Failed to update post');
                 },
             });
         } else {
-            router.post('/admin/posts', formData, {
+            router.post('/admin/posts', payload, {
+                forceFormData: true,
                 onSuccess: () => {
                     setShowModal(false);
-                    toast.success('Post created successfully', {
-                        duration: 3000,
-                        position: 'top-right',
-                    });
+                    toast.success('Post created successfully');
                 },
                 onError: () => {
-                    toast.error('Failed to create post', {
-                        duration: 3000,
-                        position: 'top-right',
-                    });
+                    toast.error('Failed to create post');
                 },
             });
         }
@@ -314,54 +330,84 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
                                 {editPost ? 'Make changes to your blog post here.' : 'Create a new blog post here.'}
                             </DialogDescription>{' '}
                         </DialogHeader>{' '}
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="title">Title</Label>{' '}
-                                <Input id="title" name="title" value={formData.title} onChange={handleInputChange} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="content">Content</Label>{' '}
-                                <Textarea
-                                    id="content"
-                                    name="content"
-                                    value={formData.content}
-                                    onChange={handleInputChange}
-                                    required
-                                    className="min-h-[100px]"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="category">Category</Label>{' '}
-                                <Select value={formData.category_id} onValueChange={(value) => handleSelectChange('category_id', value)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a category" />
-                                    </SelectTrigger>{' '}
-                                    <SelectContent>
-                                        {categories.map((category) => (
-                                            <SelectItem key={category.id} value={category.id.toString()}>
-                                                {category.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>{' '}
-                                </Select>{' '}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="published_at">Published At</Label>{' '}
-                                <Input
-                                    id="published_at"
-                                    name="published_at"
-                                    type="datetime-local"
-                                    value={formData.published_at}
-                                    onChange={handleInputChange}
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                                    Cancel{' '}
-                                </Button>{' '}
-                                <Button type="submit">{editPost ? 'Update' : 'Create'}</Button>{' '}
-                            </DialogFooter>{' '}
-                        </form>{' '}
+                        <div className="max-h-[80vh] overflow-y-auto p-6">
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Title</Label>{' '}
+                                    <Input id="title" name="title" value={formData.title} onChange={handleInputChange} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="image">Image</Label>
+                                    <Input
+                                        id="image"
+                                        name="image"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] || null;
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                image: file,
+                                            }));
+
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setPreviewImage(reader.result as string);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            } else {
+                                                setPreviewImage(null);
+                                            }
+                                        }}
+                                    />
+
+                                    {previewImage && <img src={previewImage} alt="Preview" className="mb-4 h-auto max-w-full rounded" />}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="content">Content</Label>{' '}
+                                    <Textarea
+                                        id="content"
+                                        name="content"
+                                        value={formData.content}
+                                        onChange={handleInputChange}
+                                        required
+                                        className="min-h-[100px]"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="category">Category</Label>{' '}
+                                    <Select value={formData.category_id} onValueChange={(value) => handleSelectChange('category_id', value)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a category" />
+                                        </SelectTrigger>{' '}
+                                        <SelectContent>
+                                            {categories.map((category) => (
+                                                <SelectItem key={category.id} value={category.id.toString()}>
+                                                    {category.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>{' '}
+                                    </Select>{' '}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="published_at">Published At</Label>{' '}
+                                    <Input
+                                        id="published_at"
+                                        name="published_at"
+                                        type="datetime-local"
+                                        value={formData.published_at}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                                        Cancel{' '}
+                                    </Button>{' '}
+                                    <Button type="submit">{editPost ? 'Update' : 'Create'}</Button>{' '}
+                                </DialogFooter>{' '}
+                            </form>{' '}
+                        </div>
                     </DialogContent>{' '}
                 </Dialog>{' '}
             </div>{' '}

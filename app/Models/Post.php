@@ -13,7 +13,7 @@ class Post extends Model
        use HasFactory;
 
     protected $fillable = [
-        'title','content','category_id', 'published_at'
+        'title','content','category_id', 'published_at', 'image',
     ];
 
     public function category():BelongsTo
@@ -23,5 +23,11 @@ class Post extends Model
     public function comments():HasMany
     {
         return $this->hasmany(Comment::class);
+    }
+
+        protected $appends = ['image_url'];
+        public function getImageUrlAttribute()
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
     }
 }
